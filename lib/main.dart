@@ -1,9 +1,17 @@
-// ignore_for_file: depend_on_referenced_packages
+// ignore_for_file: depend_on_referenced_packages, library_private_types_in_public_api
 
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:muyu/setting.dart';
 
-void main() {
+import 'controller.dart';
+
+Future<void> main() async {
+  await GetStorage.init(); //*初始化本地存储
+  Get.put(Controller()); //*初始化语言
+  C = Get.find(); //*获取控制器
   runApp(const MyApp());
 }
 
@@ -12,16 +20,16 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: MyHomePage(title: 'Flutter Demo Home Page'),
+    return const GetMaterialApp(
+      home: MyHomePage(),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key, required this.title}) : super(key: key);
-
-  final String title;
+  const MyHomePage({
+    Key? key,
+  }) : super(key: key);
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
@@ -36,7 +44,7 @@ class _MyHomePageState extends State<MyHomePage>
   @override
   void initState() {
     super.initState();
-
+    C.get(); //*从本地获取数据
     controller = AnimationController(
       duration: const Duration(milliseconds: 150),
       vsync: this,
@@ -104,7 +112,9 @@ class _MyHomePageState extends State<MyHomePage>
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.white,
         clipBehavior: Clip.antiAlias,
-        onPressed: () {},
+        onPressed: () {
+          Get.to(() => const Setting(), transition: Transition.topLevel);
+        },
         child: const Icon(Icons.settings, color: Colors.black, size: 30),
       ),
     );
@@ -118,6 +128,8 @@ class _MyHomePageState extends State<MyHomePage>
 }
 
 class DeedAnimation extends StatefulWidget {
+  const DeedAnimation({super.key});
+
   @override
   _DeedAnimationState createState() => _DeedAnimationState();
 }
@@ -174,8 +186,8 @@ class _DeedAnimationState extends State<DeedAnimation>
           top: _textPositionAnimation.value,
           child: Opacity(
             opacity: _textOpacityAnimation.value,
-            child: const Text('功德 + 1',
-                style: TextStyle(
+            child: Text(C.text.value,
+                style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.bold)),
