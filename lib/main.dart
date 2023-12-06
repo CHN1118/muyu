@@ -1,7 +1,10 @@
 // ignore_for_file: depend_on_referenced_packages, library_private_types_in_public_api
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:muyu/setting.dart';
@@ -9,9 +12,9 @@ import 'package:muyu/setting.dart';
 import 'controller.dart';
 
 Future<void> main() async {
-  await GetStorage.init(); //*初始化本地存储
-  Get.put(Controller()); //*初始化语言
-  C = Get.find(); //*获取控制器
+  await GetStorage.init();
+  Get.put(Controller()).get();
+  C = Get.find();
   runApp(const MyApp());
 }
 
@@ -22,6 +25,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const GetMaterialApp(
       home: MyHomePage(),
+      defaultTransition: Transition.topLevel,
     );
   }
 }
@@ -35,16 +39,29 @@ class MyHomePage extends StatefulWidget {
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
+List<Widget> textAnimations = [];
+Timer? timer;
+
 class _MyHomePageState extends State<MyHomePage>
     with SingleTickerProviderStateMixin {
   late AnimationController controller;
   late Animation<double> sizeAnimation;
-  List<Widget> textAnimations = [];
+
+  void startTimer() {
+    timer = Timer(const Duration(milliseconds: 1000), () {
+      setState(() {
+        textAnimations = [];
+      });
+    });
+  }
+
+  void cancelTimer() {
+    timer?.cancel();
+  }
 
   @override
   void initState() {
     super.initState();
-    C.get(); //*从本地获取数据
     controller = AnimationController(
       duration: const Duration(milliseconds: 150),
       vsync: this,
@@ -52,16 +69,17 @@ class _MyHomePageState extends State<MyHomePage>
 
     sizeAnimation = TweenSequence<double>([
       TweenSequenceItem(
-          tween: Tween<double>(begin: 200.0, end: 220.0), weight: 50),
+          tween: Tween<double>(begin: 230.0, end: 220.0), weight: 50),
       TweenSequenceItem(
-          tween: Tween<double>(begin: 220.0, end: 200.0), weight: 50),
+          tween: Tween<double>(begin: 220.0, end: 230.0), weight: 50),
     ]).animate(controller);
   }
 
   Future<void> _onButtonPress() async {
-    AudioPlayer player = AudioPlayer();
+    cancelTimer();
     setState(() {
-      textAnimations.add(DeedAnimation());
+      textAnimations.add(const DeedAnimation());
+      startTimer();
       if (controller.status == AnimationStatus.completed) {
         controller.reverse();
       } else if (controller.status == AnimationStatus.dismissed) {
@@ -70,7 +88,6 @@ class _MyHomePageState extends State<MyHomePage>
         controller.forward(from: 0.0);
       }
     });
-    await player.play(AssetSource('audio/muyu.mp3'));
   }
 
   @override
@@ -84,8 +101,8 @@ class _MyHomePageState extends State<MyHomePage>
               animation: controller,
               builder: (context, child) {
                 return SizedBox(
-                    width: 200.0,
-                    height: 300.0,
+                    width: 230.0,
+                    height: 400.0,
                     child: Stack(
                       children: textAnimations,
                     ));
@@ -113,7 +130,7 @@ class _MyHomePageState extends State<MyHomePage>
         backgroundColor: Colors.white,
         clipBehavior: Clip.antiAlias,
         onPressed: () {
-          Get.to(() => const Setting(), transition: Transition.topLevel);
+          Get.to(() => const Setting());
         },
         child: const Icon(Icons.settings, color: Colors.black, size: 30),
       ),
@@ -127,6 +144,7 @@ class _MyHomePageState extends State<MyHomePage>
   }
 }
 
+//* 文字动画
 class DeedAnimation extends StatefulWidget {
   const DeedAnimation({super.key});
 
@@ -139,17 +157,22 @@ class _DeedAnimationState extends State<DeedAnimation>
   late AnimationController _textController;
   late Animation<double> _textPositionAnimation;
   late Animation<double> _textOpacityAnimation;
+  AudioPlayer player = AudioPlayer();
 
   @override
   void initState() {
     super.initState();
-
+    //? 语音播放
+    player.play(AssetSource('audio/muyu1.mp3'));
+    //? 轻微震动
+    HapticFeedback.lightImpact();
+    //? 文字动画
     _textController = AnimationController(
       duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
-
-    _textPositionAnimation = Tween<double>(begin: 58.0, end: 0.0).animate(
+    //? 文字动画
+    _textPositionAnimation = Tween<double>(begin: 100.0, end: 0.0).animate(
       CurvedAnimation(parent: _textController, curve: Curves.easeOut),
     );
     _textOpacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
@@ -159,21 +182,23 @@ class _DeedAnimationState extends State<DeedAnimation>
       ),
     );
 
-    _textController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            // Remove this widget after animation completes.
-            setState(() {
-              // Remove this widget after animation completes.
-              // textAnimations.removeAt(0);
-            });
-          }
-        });
-      }
-    });
+    // _textController.addStatusListener((status) {
+    //   if (status == AnimationStatus.completed) {
+    //     WidgetsBinding.instance.addPostFrameCallback((_) {
+    //       if (mounted) {
+    //         setState(() {});
+    //       }
+    //     });
+    //   }
+    // });
 
     _textController.forward();
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
   }
 
   @override
@@ -186,11 +211,12 @@ class _DeedAnimationState extends State<DeedAnimation>
           top: _textPositionAnimation.value,
           child: Opacity(
             opacity: _textOpacityAnimation.value,
-            child: Text(C.text.value,
+            child: Obx(() => Text(
+                C.text_list.where((i) => i['active']).toList()[0]['text'],
                 style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
-                    fontWeight: FontWeight.bold)),
+                    fontWeight: FontWeight.bold))),
           ),
         );
       },
